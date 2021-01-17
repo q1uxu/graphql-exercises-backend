@@ -149,14 +149,14 @@ const resolvers = {
     addBook: (root, args) => {
       const newBook = {
         ...args,
-        uuid: new uuid()
+        id: uuid()
       }
       books = books.concat(newBook)
       const author = authors.find(a => a.name === args.author);
       if (!author) {
         authors = authors.concat({
           name: args.author,
-          id: new uuid()
+          id: uuid()
         })
       }
       return newBook;
