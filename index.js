@@ -1,8 +1,11 @@
 const { ApolloServer, gql, UserInputError } = require('apollo-server')
 const mongoose = require('mongoose')
+const jwt = require('jsonwebtoken')
 const Book = require('./models/Book')
 const Author = require('./models/Author')
+const User = require('./models/User')
 
+const JWT_SECRET = 'NEED_HERE_A_SECRET_KEY'
 const MONGODB_URI = 'mongodb://localhost/fullstackopen-graphql-library'
 mongoose.set('useFindAndModify', false)
 mongoose.set('useCreateIndex', true)
@@ -32,11 +35,22 @@ const typeDefs = gql`
     bookCount: Int
   }
 
+  type User {
+    username: String!
+    favoriteGenre: String!
+    id: ID!
+  }
+
+  type Token {
+    value: String!
+  }
+
   type Query {
     bookCount: Int!
     authorCount: Int!
     allBooks(author: String, genre: String): [Book!]!
     allAuthors: [Author!]!
+    me: User
   }
 
   type Mutation {
@@ -51,6 +65,16 @@ const typeDefs = gql`
       name: String!
       setBornTo: Int!
     ): Author
+
+    createUser(
+      username: String!
+      favoriteGenre: String!
+    ): User
+
+    login(
+      username: String!
+      password: String!
+    ): Token
   }
 `
 
@@ -70,7 +94,10 @@ const resolvers = {
       // }
       // return result;
     },
-    allAuthors: () => Author.find({})
+    allAuthors: () => Author.find({}),
+    me: (root, args, context) => {
+      return context.currentUser
+    } 
   },
 
   Mutation: {
@@ -100,6 +127,26 @@ const resolvers = {
         { born: args.setBornTo },
         { new: true }
       )
+    },
+    createUser: async (root, args) => {
+      const user = new User(args);
+      return user.save()
+        .catch(error => {
+          throw new UserInputError(error.message, {
+            invalidArgs: args,
+          })
+        })
+    },
+    login: async (root, args) => {
+      const user = await User.findOne({ username: args.username });
+      if (!user || args.password !== 'password') {
+        throw new UserInputError("wrong credentials")
+      }
+      const userForToken = {
+        username: user.username,
+        id: user._id
+      }
+      return { value: jwt.sign(userForToken, JWT_SECRET) };
     }
   }
 }
@@ -107,57 +154,21 @@ const resolvers = {
 const server = new ApolloServer({
   typeDefs,
   resolvers,
+  context: async ({req}) => {
+    const auth = req ? req.headers.authorization : null;
+    if (auth && auth.toLowerCase().startsWith('bearer ')) {
+      const decodedToken = jwt.verify(
+        auth.substring(7), JWT_SECRET
+      )
+
+      const currentUser = await User
+        .findById(decodedToken.id)
+
+      return { currentUser }
+    }
+  }
 })
 
 server.listen().then(({ url }) => {
   console.log(`Server ready at ${url}`)
 })
-
-
-/*
-query count {
-  bookCount
-  authorCount
-}
-
-query allAuthors{
-  allAuthors {
-    id
-    name
-    born
-  }
-}
-
-query allBooks {
-  allBooks {
-    id
-    title
-    published
-    genres
-    author {
-      id
-      name
-      born
-    }
-  }
-}
-
-mutation addBook{
-  addBook(
-    title: "new Book",
-    author: "new author",
-    published: 2021,
-    genres: ["a", "b"]
-  ) {
-    id
-    title
-    published
-    genres
-    author {
-        id
-      name
-      born
-    }
-  }
-}
-*/
