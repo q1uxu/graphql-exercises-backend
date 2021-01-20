@@ -1,5 +1,4 @@
-const { ApolloServer, gql } = require('apollo-server')
-const { v1: uuid } = require('uuid')
+const { ApolloServer, gql, UserInputError } = require('apollo-server')
 const mongoose = require('mongoose')
 const Book = require('./models/Book')
 const Author = require('./models/Author')
@@ -81,13 +80,19 @@ const resolvers = {
         author = new Author({ name: args.author })
       }
       author.bookCount += 1;
-      await author.save();
+      try {
+        await author.save();
       const newBook = new Book({
         ...args,
         author: author._id
       })
       const savedBook = await newBook.save()
-      return savedBook.execPopulate('author')
+        return savedBook.execPopulate('author')
+      } catch (error) {
+        throw new UserInputError(error.message, {
+          invalidArgs: args,
+        })
+      }
     },
     editAuthor: async (root, args) => {
       return Author.findOneAndUpdate(
@@ -109,7 +114,7 @@ server.listen().then(({ url }) => {
 })
 
 
-/* 
+/*
 query count {
   bookCount
   authorCount
@@ -144,12 +149,12 @@ mutation addBook{
     published: 2021,
     genres: ["a", "b"]
   ) {
-  	id
+    id
     title
     published
     genres
     author {
-     	id
+        id
       name
       born
     }
