@@ -74,22 +74,14 @@ const resolvers = {
     allAuthors: () => Author.find({})
   },
 
-  Author: {
-    // TODO: 作者对象的bookCount字段
-    bookCount: (root) => {
-      return books.filter(book => book.author === root.name).length;
-    }
-  },
-
-  // TODO: 一本书的author字段
-
   Mutation: {
     addBook: async (root, args) => {
       let author = await Author.findOne({ name: args.author })
       if (!author) {
-        const newAuthor = new Author({ name: args.author })
-        author = await newAuthor.save();
+        author = new Author({ name: args.author })
       }
+      author.bookCount += 1;
+      await author.save();
       const newBook = new Book({
         ...args,
         author: author._id
@@ -97,16 +89,12 @@ const resolvers = {
       const savedBook = await newBook.save()
       return savedBook.execPopulate('author')
     },
-    // TODO: editAuthorMutation
-    editAuthor: (root, args) => {
-      const author = authors.find(a => a.name === args.name);
-      if (!author) return null;
-      const updatedAuthor = {
-        ...author,
-        born: args.setBornTo
-      };
-      authors = authors.map(u => u.name === updatedAuthor.name ? updatedAuthor : u);
-      return updatedAuthor;
+    editAuthor: async (root, args) => {
+      return Author.findOneAndUpdate(
+        { name: args.name },
+        { born: args.setBornTo },
+        { new: true }
+      )
     }
   }
 }
