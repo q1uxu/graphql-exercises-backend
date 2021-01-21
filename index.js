@@ -82,17 +82,15 @@ const resolvers = {
   Query: {
     bookCount: () => Book.countDocuments(),
     authorCount: () => Author.countDocuments(),
-    allBooks: (root, args) => {
-      return Book.find({}).populate('author')
-      // TODO: 使用参数进行allBooks查询
-      // let result = books;
-      // if (args.author) {
-      //   result = result.filter(book => book.author === args.author);
-      // }
-      // if (args.genre) {
-      //   result = result.filter(book => book.genres.includes(args.genre));
-      // }
-      // return result;
+    allBooks: async (root, args) => {
+      let result = await Book.find({}).populate('author')
+      if (args.author) {
+        result = result.filter(book => book.author.name === args.author);
+      }
+      if (args.genre) {
+        result = result.filter(book => book.genres.includes(args.genre));
+      }
+      return result;
     },
     allAuthors: () => Author.find({}),
     me: (root, args, context) => {
